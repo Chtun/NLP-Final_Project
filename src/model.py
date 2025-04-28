@@ -25,7 +25,7 @@ class LlamaWithDefenseTags(nn.Module):
         # DefenseTagEncoder
         self.defense_tag_encoder = DefenseTagEncoder(num_tags=num_tags, tag_dim=self.llama.model.embed_tokens.embedding_dim)
 
-    def forward(self, input_ids, attention_mask, tag_ids):
+    def forward(self, input_ids, attention_mask, tag_ids, labels=None):
         """
         Args:
             input_ids: (batch_size, seq_len)
