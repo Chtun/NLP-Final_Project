@@ -1,117 +1,160 @@
 import json
 from config import MSRPC_DATA_FOLDER, PROMPTS_FILE
-from preprocessing.data_preprocessing import load_msr_dup_detection_corpus, process_dup_detection, process_dup_detection_with_injection, generate_injection_task_strs
-from preprocessing.injection_preprocessing import generate_injection_list, get_injection_prepend
-import random
+from preprocessing.data_preprocessing import *
+from preprocessing.injection_preprocessing import *
 
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader
-from preprocessing.dataloader import TaggingDataset
-from config import QUERY_TAG_IDX, DATA_TAG_IDX
+from preprocessing.dataloader import *
+from config import *
+from model.model import *
 
 
-with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
-    prompts_data = json.load(f)
-
-# Convert the JSON into a dictionary of dictionaries
-prompts_dict = {}
-
-for task in prompts_data:
-    task_name = task['task']
-    task_prompts = {prompt['type']: prompt['text'] for prompt in task['prompts']}
-    prompts_dict[task_name] = task_prompts
+prompts_dict = extract_prompts(prompt_file=PROMPTS_FILE)
 
 
-dup_detection_instruction_prompt = prompts_dict["Duplicate sentence detection"]["Instruction prompt"]
-dup_detection_injection_prompt = prompts_dict["Duplicate sentence detection"]["Injected instruction"]
+task_names = [
+    "Duplicate sentence detection"
+]
 
-dup_detection_test_file_path = MSRPC_DATA_FOLDER + "msr_paraphrase_test.txt"
-dup_detection_instruction_test_dataset = load_msr_dup_detection_corpus(dup_detection_test_file_path)
-dup_detection_injection_test_dataset = load_msr_dup_detection_corpus(dup_detection_test_file_path)
+no_attack_tasks = {}
+injected_attack_tasks = {}
 
-processed_dup_detection_instruction_test = process_dup_detection(
-    dup_detection_tuples=dup_detection_instruction_test_dataset,
-    prompt=dup_detection_instruction_prompt
+
+for task_name_i in task_names:
+    # Generate the No Attack tasks.
+    train_i_file_path = get_data_path(task_name_i, train=True)
+
+    instruction_prompt = prompts_dict[task_name_i]["Instruction prompt"]
+    instruction_train_parsed_corpus = load_corpus(task_name_i, train_i_file_path)
+    processed_instruction_train = process_tasks(
+        task_name=task_name_i,
+        input_output=instruction_train_parsed_corpus,
+        prompt=instruction_prompt
     )
 
-pos_match_test_dataset = [t for t in dup_detection_injection_test_dataset if t[2] == 1]
-neg_match_test_dataset = [t for t in dup_detection_injection_test_dataset if t[2] == 0]
+    no_attack_tasks[task_name_i] = processed_instruction_train
+    injected_attack_tasks[task_name_i] = {}
 
-# Process the injected tasks into list of strings.
-processed_pos_injected_tasks = generate_injection_task_strs(
-    injection_set=pos_match_test_dataset,
-    injected_prompt=dup_detection_injection_prompt
-)
-processed_neg_injected_tasks = generate_injection_task_strs(
-    injection_set=neg_match_test_dataset,
-    injected_prompt=dup_detection_injection_prompt
-)
+    # Generate the Injected Attack tasks.
+    for task_name_j in task_names:
+        injected_prompt = prompts_dict[task_name_j]["Injected instruction"]
 
-# Generate samples for positive and negative target tasks as well as injection tasks.
-sampled_pos_target_set = random.sample(pos_match_test_dataset, min(100, len(pos_match_test_dataset)))
-sampled_neg_target_set = random.sample(neg_match_test_dataset, min(100, len(neg_match_test_dataset)))
+        train_j_file_path = get_data_path(task_name_j, train=True)
+        
+        injected_train_parsed_corpus = load_corpus(task_name_j, train_j_file_path)
 
-injected_prepend = get_injection_prepend()
+        generated_injection_list, sampled_target_tasks = generate_target_injection_pairs(
+            target_task_name=task_name_i,
+            target_task_corpus=instruction_train_parsed_corpus,
+            injected_task_name=task_name_j,
+            injected_prompt=injected_prompt,
+            injected_task_corpus=injected_train_parsed_corpus
+        )
 
-# Generate a list of prompt injections.
-pos_injection_list = generate_injection_list(
-    injected_prepend=injected_prepend,
-    injected_task_list=processed_pos_injected_tasks
-)
+        processed_injected_tasks = process_tasks_with_injection(
+            task_name=task_name_i,
+            input_output=sampled_target_tasks,
+            prompt=instruction_prompt,
+            injection_list=generated_injection_list
+        )
 
-neg_injection_list = generate_injection_list(
-    injected_prepend=injected_prepend,
-    injected_task_list=processed_neg_injected_tasks
-)
-
-processed_pos_injected_set = process_dup_detection_with_injection(
-    dup_detection_tuples=sampled_pos_target_set,
-    prompt=dup_detection_instruction_prompt,
-    injection_list=neg_injection_list
-    )
-
-processed_neg_injected_set = process_dup_detection_with_injection(
-    dup_detection_tuples=sampled_neg_target_set,
-    prompt=dup_detection_instruction_prompt,
-    injection_list=pos_injection_list
-    )
-
-processed_dup_detection_injection_test = processed_pos_injected_set + processed_neg_injected_set
-
-# Prepare the data for the custom dataset formatter and loader.
-dup_detection_instruction_test_prepared = [ (row[0], row[1]) for row in processed_dup_detection_instruction_test ]
-dup_detection_injection_test_prepared = [ (row[0], row[1]) for row in processed_dup_detection_injection_test ]
+        injected_attack_tasks[task_name_i][task_name_j] = processed_injected_tasks
 
 
 # Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/llama-2-7b-chat-hf")
+tokenizer = AutoTokenizer.from_pretrained(LLAMA_7B_MODEL_NAME)
 tokenizer.pad_token = tokenizer.eos_token
 
-# Create dataset and dataloader
-dup_detection_instruction_test_dataset = TaggingDataset(dup_detection_instruction_test_prepared, tokenizer)
-dup_detection_instruction_test_dataloader = DataLoader(dup_detection_instruction_test_dataset, batch_size=2, shuffle=True, collate_fn=lambda x: x)
+# Prepare the data for the custom dataset formatter and loader.
+instruction_dataloaders = {}
+injected_dataloaders = {}
 
-dup_detection_injection_test_dataset = TaggingDataset(dup_detection_injection_test_prepared, tokenizer)
-dup_detection_injection_test_dataloader = DataLoader(dup_detection_injection_test_dataset, batch_size=2, shuffle=True, collate_fn=lambda x: x)
+for task_name_i in no_attack_tasks.keys():
+    processed_instruction_train = no_attack_tasks[task_name_i]
+    prepared_instruction_train = [ (row[0], row[1]) for row in processed_instruction_train ]
 
-# print("Duplicate Detection No Attack Instruction:")
-# for batch in dup_detection_instruction_test_dataloader:
-#     for item in batch:
-#         print("Input IDs:", item["input_ids"])
-#         print("Attention Mask:", item["attention_mask"])
-#         print("Tag IDs:", item["tag_ids"])
-#         print()
+    # Create dataset and dataloader
+    instruction_train_dataset = TaggingDataset(prepared_instruction_train, tokenizer)
+    instruction_train_dataloader = DataLoader(
+        instruction_train_dataset,
+        batch_size=2,
+        shuffle=True,
+        collate_fn=make_collate_fn(tokenizer)
+        )
+    
+    instruction_dataloaders[task_name_i] = instruction_train_dataloader
 
-# print("Duplicate Detection Attacked Instruction:")
-# for batch in dup_detection_injection_test_dataloader:
-#     for item in batch:
-#         print("Input IDs:", item["input_ids"])
-#         print("Attention Mask:", item["attention_mask"])
-#         print("Tag IDs:", item["tag_ids"])
-#         print()
-
-print(len(dup_detection_instruction_test_prepared))
-print(len(dup_detection_injection_test_prepared))
-
+    # print(f"{task_name_i} No Attack instruction:")
+    # for batch in instruction_train_dataloader:
+    #     print("Input IDs:", batch["input_ids"])
+    #     print("Attention Mask:", batch["attention_mask"])
+    #     print("Tag IDs:", batch["tag_ids"])
+    #     print()
 
 
+for task_name_i in injected_attack_tasks.keys():
+    injected_dataloaders[task_name_i] = {}
+
+    for task_name_j in injected_attack_tasks[task_name_i].keys():
+        processed_injected_train = injected_attack_tasks[task_name_i][task_name_j]
+        prepared_injected_train = [ (row[0], row[1]) for row in processed_injected_train ]
+
+        injected_train_dataset = TaggingDataset(prepared_injected_train, tokenizer)
+        injected_train_dataloader = DataLoader(
+            injected_train_dataset,
+            batch_size=2,
+            shuffle=True,
+            collate_fn=make_collate_fn(tokenizer)
+            )
+        
+        injected_dataloaders[task_name_i][task_name_j] = injected_train_dataloader
+
+        # print(f"{task_name_i} original x {task_name_j} injected instruction:")
+        # for batch in injected_train_dataloader:
+        #     print("Input IDs:", batch["input_ids"])
+        #     print("Attention Mask:", batch["attention_mask"])
+        #     print("Tag IDs:", batch["tag_ids"])
+        #     print()
+
+
+from torch.optim import AdamW
+from tqdm import tqdm  # For progress bar
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+num_epochs = 20
+
+# Initialize the model
+model = LlamaWithDefenseTags(llama_model_name=LLAMA_7B_MODEL_NAME, num_tags=2)  # Replace with actual model name
+model = model.to(device)  # Ensure you're using the correct device (GPU/CPU)
+
+# Create the optimizer
+optimizer = AdamW(model.parameters(), lr=5e-5)
+
+# Set your dataloader
+instruction_train_dataloader = instruction_dataloaders[DUP_DETECTION]
+
+# Training loop
+model.train()
+for epoch in range(num_epochs):
+    loop = tqdm(instruction_train_dataloader, desc=f"Epoch {epoch+1}")
+    for batch in loop:
+        # Move data to device
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        tag_ids = batch['tag_ids'].to(device)
+
+        # Forward pass
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask, tag_ids=tag_ids)
+
+        # Loss computation (if using causal language model loss)
+        logits = outputs.logits  # Assuming the model outputs logits (standard for LM models)
+        loss = nn.CrossEntropyLoss()(logits.view(-1, logits.size(-1)), input_ids.view(-1))
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Update progress bar
+        loop.set_postfix(loss=loss.item())

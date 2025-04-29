@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset
 import torch
+from torch.nn.utils.rnn import pad_sequence
 
 class TaggingDataset(Dataset):
     def __init__(self, examples, tokenizer):
@@ -40,3 +41,23 @@ class TaggingDataset(Dataset):
             "attention_mask": attention_mask,
             "tag_ids": tag_ids
         }
+
+def make_collate_fn(tokenizer):
+    def collate_fn(batch):
+        input_ids = [item["input_ids"] for item in batch]
+        attention_mask = [item["attention_mask"] for item in batch]
+        tag_ids = [item["tag_ids"] for item in batch]
+
+        input_ids_padded = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id)
+        attention_mask_padded = pad_sequence(attention_mask, batch_first=True, padding_value=0)
+        tag_ids_padded = pad_sequence(tag_ids, batch_first=True, padding_value=0)
+
+        print(tag_ids)
+
+        return {
+            "input_ids": input_ids_padded,
+            "attention_mask": attention_mask_padded,
+            "tag_ids": tag_ids_padded
+        }
+
+    return collate_fn
