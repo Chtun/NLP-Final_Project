@@ -1,0 +1,5 @@
+setup.py
+src/defensive_tagging_LLM.egg-info/PKG-INFO
+src/defensive_tagging_LLM.egg-info/SOURCES.txt
+src/defensive_tagging_LLM.egg-info/dependency_links.txt
+src/defensive_tagging_LLM.egg-info/top_level.txt
