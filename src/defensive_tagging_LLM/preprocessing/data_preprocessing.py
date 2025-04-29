@@ -1,8 +1,8 @@
 import csv
-from config import *
+from defensive_tagging_LLM.config import *
 import random
 import json
-from preprocessing.injection_preprocessing import *
+from defensive_tagging_LLM.preprocessing.injection_preprocessing import *
 
 def extract_prompts(prompt_file: str) -> dict:
     with open(prompt_file, "r", encoding="utf-8") as f:

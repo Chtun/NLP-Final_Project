@@ -1,7 +1,7 @@
 import kagglehub
 import os
 import shutil
-from config import MSRPC_DATA_FOLDER
+from defensive_tagging_LLM.config import MSRPC_DATA_FOLDER
 
 # Download latest version
 path = kagglehub.dataset_download("doctri/microsoft-research-paraphrase-corpus")

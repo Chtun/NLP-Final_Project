@@ -1,14 +1,14 @@
-import json
-from config import MSRPC_DATA_FOLDER, PROMPTS_FILE
-from preprocessing.data_preprocessing import *
-from preprocessing.injection_preprocessing import *
+from defensive_tagging_LLM.preprocessing.data_preprocessing import *
+from defensive_tagging_LLM.preprocessing.injection_preprocessing import *
+from defensive_tagging_LLM.preprocessing.dataloader import *
+from defensive_tagging_LLM.config import *
+from defensive_tagging_LLM.model.model import *
 
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader
-from preprocessing.dataloader import *
-from config import *
-from model.model import *
 
+from torch.optim import AdamW
+from tqdm import tqdm
 
 prompts_dict = extract_prompts(prompt_file=PROMPTS_FILE)
 
@@ -116,10 +116,6 @@ for task_name_i in injected_attack_tasks.keys():
         #     print("Attention Mask:", batch["attention_mask"])
         #     print("Tag IDs:", batch["tag_ids"])
         #     print()
-
-
-from torch.optim import AdamW
-from tqdm import tqdm  # For progress bar
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 num_epochs = 20
