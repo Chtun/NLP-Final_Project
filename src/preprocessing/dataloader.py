@@ -1,5 +1,4 @@
-from torch.utils.data import Dataset, DataLoader
-from transformers import AutoTokenizer
+from torch.utils.data import Dataset
 import torch
 
 class TaggingDataset(Dataset):
@@ -41,25 +40,3 @@ class TaggingDataset(Dataset):
             "attention_mask": attention_mask,
             "tag_ids": tag_ids
         }
-
-# Example: a list of examples, each made up of multiple texts + tags
-examples = [
-    (["This is a query.", "And this is data."], [0, 1]),
-    (["Another query.", "Another piece of data."], [0, 1])
-]
-
-# Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/llama-2-7b-chat-hf")
-tokenizer.pad_token = tokenizer.eos_token
-
-# Create dataset and dataloader
-dataset = TaggingDataset(examples, tokenizer)
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=lambda x: x)  # Custom collate_fn since different lengths
-
-
-for batch in dataloader:
-    for item in batch:
-        print("Input IDs:", item["input_ids"])
-        print("Attention Mask:", item["attention_mask"])
-        print("Tag IDs:", item["tag_ids"])
-        print()

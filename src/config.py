@@ -1,1 +1,9 @@
+PROMPTS_FOLDER = "./prompts/"
+PROMPTS_FILE = PROMPTS_FOLDER + "prompts.json"
+
 DATA_FOLDER = "../data/"
+
+MSRPC_DATA_FOLDER = DATA_FOLDER + "msrpc/"
+
+QUERY_TAG_IDX = 0
+DATA_TAG_IDX = 1

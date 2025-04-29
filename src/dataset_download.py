@@ -1,15 +1,16 @@
 import kagglehub
 import os
 import shutil
-from config import DATA_FOLDER
+from config import MSRPC_DATA_FOLDER
 
 # Download latest version
 path = kagglehub.dataset_download("doctri/microsoft-research-paraphrase-corpus")
 
 print("Path to dataset files:", path)
 
-# If the files are in a directory, move them to the specified folder
+# Move the data to the specified data folder.
 if os.path.isdir(path):
-    shutil.move(path, DATA_FOLDER)
+    shutil.move(path, MSRPC_DATA_FOLDER)
 else:
     print(f"Expected a directory but got {path}")
+
