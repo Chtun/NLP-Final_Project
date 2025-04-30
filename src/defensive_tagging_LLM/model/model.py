@@ -5,7 +5,7 @@ from transformers import LlamaForCausalLM, AutoTokenizer
 class DefenseTagEncoder(nn.Module):
     def __init__(self, num_tags: int, tag_dim: int):
         super().__init__()
-        self.tag_embeddings = nn.Embedding(num_tags, tag_dim)
+        self.tag_embeddings = nn.Embedding(num_tags, tag_dim).half()
         self._initialize_weights()
 
     def _initialize_weights(self):
