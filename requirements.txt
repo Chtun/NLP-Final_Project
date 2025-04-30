@@ -1,6 +1,6 @@
 torch --index-url https://download.pytorch.org/whl/cu126
 torchvision --index-url https://download.pytorch.org/whl/cu126
 torchaudio --index-url https://download.pytorch.org/whl/cu126
-transformers==4.31.0
+transformers==4.43.1
 kagglehub
 datasets

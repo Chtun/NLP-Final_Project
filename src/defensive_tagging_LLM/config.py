@@ -11,6 +11,9 @@ SST2_DATA_FOLDER = DATA_FOLDER + "sst2/"
 SMS_SPAM_DATA_FOLDER = DATA_FOLDER + "sms-spam/"
 GLUE_DATA_FOLDER = DATA_FOLDER + "glue/"
 
+# Model weights folder
+MODEL_WEIGHTS_FOLDER = "../../model_weights"
+
 # Tag indices
 QUERY_TAG_IDX = 0
 DATA_TAG_IDX = 1

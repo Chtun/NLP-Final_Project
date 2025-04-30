@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 from transformers import LlamaForCausalLM, AutoTokenizer
+import os
 
 class DefenseTagEncoder(nn.Module):
     def __init__(self, num_tags: int, tag_dim: int):
@@ -64,3 +65,37 @@ class LlamaWithDefenseTags(nn.Module):
         )
 
         return outputs
+    
+    def save_pretrained(self, save_directory: str):
+        os.makedirs(save_directory, exist_ok=True)
+        # Save base LLaMA model and tokenizer
+        self.llama.save_pretrained(save_directory)
+        self.tokenizer.save_pretrained(save_directory)
+
+        # Save DefenseTagEncoder weights
+        torch.save(self.defense_tag_encoder.state_dict(), os.path.join(save_directory, "defense_tag_encoder.pt"))
+
+        # Save a config for reconstruction (just num_tags and llama_model_name)
+        config = {
+            "num_tags": self.defense_tag_encoder.tag_embeddings.num_embeddings,  # num_tags
+            "llama_model_name": self.llama.config._name_or_path,  # LLaMA model name
+        }
+        torch.save(config, os.path.join(save_directory, "custom_model_config.pt"))
+
+    @classmethod
+    def from_pretrained(cls, load_directory: str):
+        # Load config
+        config = torch.load(os.path.join(load_directory, "custom_model_config.pt"))
+        num_tags = config["num_tags"]
+        llama_model_name = config["llama_model_name"]
+
+        # Initialize model with the same llama model and num_tags
+        model = cls(llama_model_name=llama_model_name, num_tags=num_tags)
+
+        # Load tag encoder weights
+        tag_encoder_path = os.path.join(load_directory, "defense_tag_encoder.pt")
+        model.defense_tag_encoder.load_state_dict(torch.load(tag_encoder_path))
+
+        return model
+
+

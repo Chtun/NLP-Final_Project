@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 from torch.optim import AdamW
 from tqdm import tqdm
 
-from huggingface_hub import Repository
+from huggingface_hub import HfApi
 
 prompt_file = PROMPTS_FILE
 base_model_name = LLAMA_3P2_1B_MODEL_NAME # The base LLM's name.
@@ -198,11 +198,23 @@ for epoch in range(num_epochs):
 
         loop.set_postfix(loss=loss.item())
 
-# Initialize a huggingface Repository
-repo = Repository(local_dir=".", clone_from=repo_name)
-
 # Push model weights
 model_name = f"{base_model_name}_Defensive_Tagging"
-model.save_pretrained(model_name)
+clean_model_name = re.sub(r'[^\w\-]', '_', model_name)
+model_folder_path = os.path.join(MODEL_WEIGHTS_FOLDER, clean_model_name)
+model.save_pretrained(model_folder_path)
 
-repo.push_to_hub(commit_message=f"Upload Defensive Tagging model fine-tuned on {base_model_name}")
+hf_token = os.getenv("HF_TOKEN")
+
+api = HfApi(token=hf_token)
+api.upload_folder(
+    folder_path=model_folder_path,
+    repo_id="Chtun/Defensive_Tagging_LLM",  # Your full model path on HF Hub
+    repo_type="model",
+)
+
+# Clear the model from memory
+del model
+
+# Clear cache
+torch.cuda.empty_cache()
