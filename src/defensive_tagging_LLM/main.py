@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from huggingface_hub import HfApi
 
+
 prompt_file = PROMPTS_FILE
 base_model_name = LLAMA_3P2_1B_MODEL_NAME # The base LLM's name.
 repo_name = "Chtun/Defensive_Tagging_LLM" # For saving this model to a huggingface repo.
@@ -20,11 +21,11 @@ prompts_dict = extract_prompts(prompt_file=prompt_file)
 
 task_names = [
     DUP_DETECTION,
-    GRAMMAR_CORRECTION,
-    NAT_LANG_INFERENCE,
-    SENT_ANALYSIS,
-    SPAM_DETECTION,
-    SUMMARIZATION
+    # GRAMMAR_CORRECTION,
+    # NAT_LANG_INFERENCE,
+    # SENT_ANALYSIS,
+    # SPAM_DETECTION,
+    # SUMMARIZATION
 ]
 
 no_attack_tasks = {}
@@ -149,7 +150,7 @@ full_train_dataset = ConcatDataset(combined_datasets)
 # Set the training dataloader
 train_dataloader = instruction_train_dataloader = DataLoader(
     full_train_dataset,
-    batch_size=2,
+    batch_size=1,
     shuffle=True,
     collate_fn=make_collate_fn(tokenizer)
 )
@@ -197,6 +198,10 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         loop.set_postfix(loss=loss.item())
+
+
+# Create a model weights folder, if not made already
+os.makedirs(MODEL_WEIGHTS_FOLDER, exist_ok=True)
 
 # Push model weights
 model_name = f"{base_model_name}_Defensive_Tagging"
