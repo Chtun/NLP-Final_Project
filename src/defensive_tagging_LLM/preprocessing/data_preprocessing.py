@@ -4,6 +4,7 @@ import random
 import json
 from pathlib import Path
 from defensive_tagging_LLM.preprocessing.injection_preprocessing import *
+import re
 
 def extract_prompts(prompt_file: str) -> dict:
     script_dir = Path(__file__).resolve().parent
@@ -117,10 +118,18 @@ def load_summarization_corpus(filepath: str) -> list:
         for row in reader:
             article = row['article'].strip()
             summary = row['summary'].strip()
+
+            # Clean up spaces before punctuation in both article and summary
+            article = remove_space_before_punctuation(article)
+            summary = remove_space_before_punctuation(summary)
+
             data.append((article, summary))
 
     return data
 
+def remove_space_before_punctuation(text: str) -> str:
+    # Regular expression to remove spaces before punctuation
+    return re.sub(r'\s([?.!,¿])', r'\1', text)
 
 """    DATA PROCESSING TASKS   """
 

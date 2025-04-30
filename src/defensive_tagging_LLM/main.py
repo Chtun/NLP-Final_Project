@@ -54,10 +54,10 @@ for task_name_i in task_names:
     no_attack_tasks[task_name_i] = processed_instruction_train
     injected_attack_tasks[task_name_i] = {}
 
-    print()
-    print(f"Example of no-attack task for {task_name_i}")
-    print(processed_instruction_train[0])
-    print()
+    # print()
+    # print(f"Example of no-attack task for {task_name_i}")
+    # print(processed_instruction_train[0])
+    # print()
 
     # Generate the Injected Attack tasks.
     for task_name_j in task_names:
@@ -83,9 +83,9 @@ for task_name_i in task_names:
 
         injected_attack_tasks[task_name_i][task_name_j] = processed_injected_tasks
 
-        print(f"Example of injection of task {task_name_j} into original task {task_name_i}:")
-        print(processed_injected_tasks[0])
-        print()
+        # print(f"Example of injection of task {task_name_j} into original task {task_name_i}:")
+        # print(processed_injected_tasks[0])
+        # print()
 
 
 # Load the tokenizer
@@ -105,12 +105,12 @@ for task_name_i in no_attack_tasks.keys():
     
     instruction_datasets[task_name_i] = instruction_train_dataset
 
-    for example in instruction_train_dataset:
-        print("Input IDs:", example["input_ids"])
-        print("Attention Mask:", example["attention_mask"])
-        print("Tag IDs:", example["tag_ids"])
-        print()
-        break
+    # for example in instruction_train_dataset:
+    #     print("Input IDs:", example["input_ids"])
+    #     print("Attention Mask:", example["attention_mask"])
+    #     print("Tag IDs:", example["tag_ids"])
+    #     print()
+    #     break
 
 for task_name_i in injected_attack_tasks.keys():
     injected_datasets[task_name_i] = {}
@@ -123,13 +123,13 @@ for task_name_i in injected_attack_tasks.keys():
         
         injected_datasets[task_name_i][task_name_j] = injected_train_dataset
 
-        print(f"{task_name_i} original x {task_name_j} injected instruction:")
-        for example in injected_train_dataset:
-            print("Input IDs:", example["input_ids"])
-            print("Attention Mask:", example["attention_mask"])
-            print("Tag IDs:", example["tag_ids"])
-            print()
-            break
+        # print(f"{task_name_i} original x {task_name_j} injected instruction:")
+        # for example in injected_train_dataset:
+        #     print("Input IDs:", example["input_ids"])
+        #     print("Attention Mask:", example["attention_mask"])
+        #     print("Tag IDs:", example["tag_ids"])
+        #     print()
+        #     break
 
 # Combine the datasets for full training
 combined_datasets = []
@@ -154,6 +154,11 @@ train_dataloader = instruction_train_dataloader = DataLoader(
     collate_fn=make_collate_fn(tokenizer)
 )
 
+# Calculate the number of batches
+num_batches = len(train_dataloader)
+
+# Print the number of batches
+print(f"Number of batches: {num_batches}")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 num_epochs = 4
