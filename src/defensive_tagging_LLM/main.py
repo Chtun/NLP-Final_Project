@@ -89,9 +89,11 @@ for task_name_i in no_attack_tasks.keys():
 
     print(f"{task_name_i} No Attack instruction:")
     for batch in instruction_train_dataloader:
-        print("Input IDs:", batch["input_ids"])
-        print("Attention Mask:", batch["attention_mask"])
-        print("Tag IDs:", batch["tag_ids"])
+        # print("Input IDs:", batch["input_ids"])
+        # print("Attention Mask:", batch["attention_mask"])
+        # print("Tag IDs:", batch["tag_ids"])
+        # print("Tag Mask:", batch["tag_mask"])
+        print("First input shape:", batch["input_ids"][0].shape)
         print()
 
 
@@ -114,10 +116,13 @@ for task_name_i in injected_attack_tasks.keys():
 
         print(f"{task_name_i} original x {task_name_j} injected instruction:")
         for batch in injected_train_dataloader:
-            print("Input IDs:", batch["input_ids"])
-            print("Attention Mask:", batch["attention_mask"])
-            print("Tag IDs:", batch["tag_ids"])
+            # print("Input IDs:", batch["input_ids"])
+            # print("Attention Mask:", batch["attention_mask"])
+            # print("Tag IDs:", batch["tag_ids"])
+            # print("Tag Mask:", batch["tag_mask"])
+            print("First input shape:", batch["input_ids"][0].shape)
             print()
+            break
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # num_epochs = 20

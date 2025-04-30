@@ -76,7 +76,7 @@ def make_collate_fn(tokenizer):
         input_ids_padded = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id)
         attention_mask_padded = pad_sequence(attention_mask, batch_first=True, padding_value=0)
         tag_ids_padded = pad_sequence(tag_ids, batch_first=True, padding_value=-1)
-        labels_padded = pad_sequence(labels, batch_first=True, padding_value=tokenizer.pad_token_id)
+        labels_padded = pad_sequence(labels, batch_first=True, padding_value=-100)
 
         tag_mask = (tag_ids_padded != -1).float() # Tag mask will calculate where to remove the vectors.
         tag_ids_padded[tag_ids_padded == -1] = 0 # Set the values to 0 so that it can be passed through the embedding layer.

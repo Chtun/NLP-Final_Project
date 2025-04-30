@@ -6,6 +6,11 @@ class DefenseTagEncoder(nn.Module):
     def __init__(self, num_tags: int, tag_dim: int):
         super().__init__()
         self.tag_embeddings = nn.Embedding(num_tags, tag_dim)
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        """Initialize the embedding weights with a normal distribution"""
+        nn.init.normal_(self.tag_embeddings.weight, mean=0.0, std=0.02)
 
     def forward(self, tag_indices):
         """
@@ -41,7 +46,7 @@ class LlamaWithDefenseTags(nn.Module):
         tag_embeds = self.defense_tag_encoder(tag_ids)
 
         # Apply the tag mask: Set embeddings to 0 where tag_mask is 0 (invalid tags)
-        tag_embeds = tag_embeds * tag_mask.unsqueeze(-1)
+        tag_embeds = tag_embeds.masked_fill(tag_mask.unsqueeze(-1) == 0, 0.0)
 
         # Ensure tag_embeds and token_embeds have the same length (pad or truncate tag_embeds if needed)
         if tag_embeds.size(1) < token_embeds.size(1):
