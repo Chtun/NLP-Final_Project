@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 from transformers import LlamaForCausalLM, LlamaTokenizer
 
 class DefenseTagEncoder(nn.Module):
@@ -25,7 +26,7 @@ class LlamaWithDefenseTags(nn.Module):
         # DefenseTagEncoder
         self.defense_tag_encoder = DefenseTagEncoder(num_tags=num_tags, tag_dim=self.llama.model.embed_tokens.embedding_dim)
 
-    def forward(self, input_ids, attention_mask, tag_ids, labels=None):
+    def forward(self, input_ids, attention_mask, tag_ids, tag_mask, labels=None):
         """
         Args:
             input_ids: (batch_size, seq_len)
@@ -36,16 +37,30 @@ class LlamaWithDefenseTags(nn.Module):
         # Standard token embeddings
         token_embeds = self.llama.model.embed_tokens(input_ids)
 
-        # Defense tag embeddings
+        # Defense tag embeddings (learned embeddings for each tag)
         tag_embeds = self.defense_tag_encoder(tag_ids)
+
+        # Apply the tag mask: Set embeddings to 0 where tag_mask is 0 (invalid tags)
+        tag_embeds = tag_embeds * tag_mask.unsqueeze(-1)
+
+        # Ensure tag_embeds and token_embeds have the same length (pad or truncate tag_embeds if needed)
+        if tag_embeds.size(1) < token_embeds.size(1):
+            # Pad tag_embeds with zeros if tag_embeds is shorter than token_embeds
+            pad_size = token_embeds.size(1) - tag_embeds.size(1)
+            tag_embeds = torch.cat([tag_embeds, torch.zeros(tag_embeds.size(0), pad_size, tag_embeds.size(2), device=tag_embeds.device)], dim=1)
+        elif tag_embeds.size(1) > token_embeds.size(1):
+            # Truncate tag_embeds if it's longer than token_embeds
+            tag_embeds = tag_embeds[:, :token_embeds.size(1), :]
 
         # Add defense tag embeddings to token embeddings
         inputs_embeds = token_embeds + tag_embeds
 
-        # 4. Pass through LLaMA
+        # Pass through LLaMA
         outputs = self.llama(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
+            labels=labels,
+            return_dict=True
         )
 
         return outputs

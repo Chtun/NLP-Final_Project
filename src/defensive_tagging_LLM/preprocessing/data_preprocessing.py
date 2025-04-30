@@ -2,10 +2,14 @@ import csv
 from defensive_tagging_LLM.config import *
 import random
 import json
+from pathlib import Path
 from defensive_tagging_LLM.preprocessing.injection_preprocessing import *
 
 def extract_prompts(prompt_file: str) -> dict:
-    with open(prompt_file, "r", encoding="utf-8") as f:
+    script_dir = Path(__file__).resolve().parent
+    full_path = script_dir / prompt_file
+
+    with full_path.open("r", encoding="utf-8") as f:
         prompts_data = json.load(f)
 
         # Convert the JSON into a dictionary of dictionaries

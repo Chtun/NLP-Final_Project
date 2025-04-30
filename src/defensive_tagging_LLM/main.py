@@ -10,7 +10,9 @@ from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from tqdm import tqdm
 
-prompts_dict = extract_prompts(prompt_file=PROMPTS_FILE)
+prompt_file = "../prompts/" +  "prompts.json"
+
+prompts_dict = extract_prompts(prompt_file=prompt_file)
 
 
 task_names = [
@@ -72,7 +74,7 @@ injected_dataloaders = {}
 
 for task_name_i in no_attack_tasks.keys():
     processed_instruction_train = no_attack_tasks[task_name_i]
-    prepared_instruction_train = [ (row[0], row[1]) for row in processed_instruction_train ]
+    prepared_instruction_train = [ (row[0], row[1], row[2]) for row in processed_instruction_train ]
 
     # Create dataset and dataloader
     instruction_train_dataset = TaggingDataset(prepared_instruction_train, tokenizer)
@@ -85,12 +87,12 @@ for task_name_i in no_attack_tasks.keys():
     
     instruction_dataloaders[task_name_i] = instruction_train_dataloader
 
-    # print(f"{task_name_i} No Attack instruction:")
-    # for batch in instruction_train_dataloader:
-    #     print("Input IDs:", batch["input_ids"])
-    #     print("Attention Mask:", batch["attention_mask"])
-    #     print("Tag IDs:", batch["tag_ids"])
-    #     print()
+    print(f"{task_name_i} No Attack instruction:")
+    for batch in instruction_train_dataloader:
+        print("Input IDs:", batch["input_ids"])
+        print("Attention Mask:", batch["attention_mask"])
+        print("Tag IDs:", batch["tag_ids"])
+        print()
 
 
 for task_name_i in injected_attack_tasks.keys():
@@ -98,7 +100,7 @@ for task_name_i in injected_attack_tasks.keys():
 
     for task_name_j in injected_attack_tasks[task_name_i].keys():
         processed_injected_train = injected_attack_tasks[task_name_i][task_name_j]
-        prepared_injected_train = [ (row[0], row[1]) for row in processed_injected_train ]
+        prepared_injected_train = [(row[0], row[1], row[2]) for row in processed_injected_train ]
 
         injected_train_dataset = TaggingDataset(prepared_injected_train, tokenizer)
         injected_train_dataloader = DataLoader(
@@ -110,47 +112,50 @@ for task_name_i in injected_attack_tasks.keys():
         
         injected_dataloaders[task_name_i][task_name_j] = injected_train_dataloader
 
-        # print(f"{task_name_i} original x {task_name_j} injected instruction:")
-        # for batch in injected_train_dataloader:
-        #     print("Input IDs:", batch["input_ids"])
-        #     print("Attention Mask:", batch["attention_mask"])
-        #     print("Tag IDs:", batch["tag_ids"])
-        #     print()
+        print(f"{task_name_i} original x {task_name_j} injected instruction:")
+        for batch in injected_train_dataloader:
+            print("Input IDs:", batch["input_ids"])
+            print("Attention Mask:", batch["attention_mask"])
+            print("Tag IDs:", batch["tag_ids"])
+            print()
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-num_epochs = 20
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# num_epochs = 20
 
-# Initialize the model
-model = LlamaWithDefenseTags(llama_model_name=LLAMA_7B_MODEL_NAME, num_tags=2)  # Replace with actual model name
-model = model.to(device)  # Ensure you're using the correct device (GPU/CPU)
+# # Initialize the model
+# model = LlamaWithDefenseTags(llama_model_name=LLAMA_7B_MODEL_NAME, num_tags=2)  # Replace with actual model name
+# model = model.to(device)  # Ensure you're using the correct device (GPU/CPU)
 
-# Create the optimizer
-optimizer = AdamW(model.parameters(), lr=5e-5)
+# # Create the optimizer
+# optimizer = AdamW(model.parameters(), lr=5e-5)
 
-# Set your dataloader
-instruction_train_dataloader = instruction_dataloaders[DUP_DETECTION]
+# # Set your dataloader
+# instruction_train_dataloader = instruction_dataloaders[DUP_DETECTION]
 
-# Training loop
-model.train()
-for epoch in range(num_epochs):
-    loop = tqdm(instruction_train_dataloader, desc=f"Epoch {epoch+1}")
-    for batch in loop:
-        # Move data to device
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        tag_ids = batch['tag_ids'].to(device)
+# # Training loop
+# model.train()
+# for epoch in range(num_epochs):
+#     loop = tqdm(instruction_train_dataloader, desc=f"Epoch {epoch+1}")
+#     for batch in loop:
+#         # Move data to device
+#         input_ids = batch['input_ids'].to(device)
+#         attention_mask = batch['attention_mask'].to(device)
+#         tag_ids = batch['tag_ids'].to(device)
+#         labels = batch['labels'].to(device)
 
-        # Forward pass
-        outputs = model(input_ids=input_ids, attention_mask=attention_mask, tag_ids=tag_ids)
+#         # Forward pass: compute logits and loss
+#         outputs = model(
+#             input_ids=input_ids,
+#             attention_mask=attention_mask,
+#             tag_ids=tag_ids,
+#             labels=labels
+#         )
+#         loss = outputs.loss
 
-        # Loss computation (if using causal language model loss)
-        logits = outputs.logits  # Assuming the model outputs logits (standard for LM models)
-        loss = nn.CrossEntropyLoss()(logits.view(-1, logits.size(-1)), input_ids.view(-1))
+#         # Backpropagation
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
 
-        # Backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # Update progress bar
-        loop.set_postfix(loss=loss.item())
+#         # Log loss
+#         loop.set_postfix(loss=loss.item())
