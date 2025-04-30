@@ -5,45 +5,66 @@ from defensive_tagging_LLM.config import *
 from defensive_tagging_LLM.model.model import *
 
 from transformers import AutoTokenizer
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 
 from torch.optim import AdamW
 from tqdm import tqdm
 
-prompt_file = "../prompts/" +  "prompts.json"
+from huggingface_hub import Repository
+
+prompt_file = PROMPTS_FILE
+base_model_name = LLAMA_3P2_1B_MODEL_NAME # The base LLM's name.
+repo_name = "Chtun/Defensive_Tagging_LLM" # For saving this model to a huggingface repo.
 
 prompts_dict = extract_prompts(prompt_file=prompt_file)
 
 task_names = [
-    "Duplicate sentence detection"
+    DUP_DETECTION,
+    GRAMMAR_CORRECTION,
+    NAT_LANG_INFERENCE,
+    SENT_ANALYSIS,
+    SPAM_DETECTION,
+    SUMMARIZATION
 ]
 
 no_attack_tasks = {}
 injected_attack_tasks = {}
 
+corpus_dict = {}
+
+# First, load each corpus
+for task_name_i in task_names:
+    train_i_file_path = get_data_path(task_name_i, train=True)
+    corpus_dict[task_name_i] = load_corpus(task_name_i, train_i_file_path)
+
 
 for task_name_i in task_names:
     # Generate the No Attack tasks.
-    train_i_file_path = get_data_path(task_name_i, train=True)
-
     instruction_prompt = prompts_dict[task_name_i]["Instruction prompt"]
-    instruction_train_parsed_corpus = load_corpus(task_name_i, train_i_file_path)
+    instruction_train_parsed_corpus = corpus_dict[task_name_i]
+
+    # Sample only up to a set of the corpus to balance each dataset.
+    sampled_instruction_corpus = instruction_train_parsed_corpus[:NORMAL_EXAMPLES_PER_DATASET]
     processed_instruction_train = process_tasks(
         task_name=task_name_i,
-        input_output=instruction_train_parsed_corpus,
+        input_output=sampled_instruction_corpus,
         prompt=instruction_prompt
     )
 
     no_attack_tasks[task_name_i] = processed_instruction_train
     injected_attack_tasks[task_name_i] = {}
 
+    print()
+    print(f"Example of no-attack task for {task_name_i}")
+    print(processed_instruction_train[0])
+    print()
+
     # Generate the Injected Attack tasks.
     for task_name_j in task_names:
+
         injected_prompt = prompts_dict[task_name_j]["Injected instruction"]
 
-        train_j_file_path = get_data_path(task_name_j, train=True)
-        
-        injected_train_parsed_corpus = load_corpus(task_name_j, train_j_file_path)
+        injected_train_parsed_corpus = corpus_dict[task_name_j]
 
         generated_injection_list, sampled_target_tasks = generate_target_injection_pairs(
             target_task_name=task_name_i,
@@ -62,14 +83,18 @@ for task_name_i in task_names:
 
         injected_attack_tasks[task_name_i][task_name_j] = processed_injected_tasks
 
+        print(f"Example of injection of task {task_name_j} into original task {task_name_i}:")
+        print(processed_injected_tasks[0])
+        print()
+
 
 # Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained(LLAMA_3P2_1B_MODEL_NAME)
+tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 tokenizer.pad_token = tokenizer.eos_token
 
 # Prepare the data for the custom dataset formatter and loader.
-instruction_dataloaders = {}
-injected_dataloaders = {}
+instruction_datasets = {}
+injected_datasets = {}
 
 for task_name_i in no_attack_tasks.keys():
     processed_instruction_train = no_attack_tasks[task_name_i]
@@ -77,60 +102,68 @@ for task_name_i in no_attack_tasks.keys():
 
     # Create dataset and dataloader
     instruction_train_dataset = TaggingDataset(prepared_instruction_train, tokenizer)
-    instruction_train_dataloader = DataLoader(
-        instruction_train_dataset,
-        batch_size=1,
-        shuffle=True,
-        collate_fn=make_collate_fn(tokenizer)
-        )
     
-    instruction_dataloaders[task_name_i] = instruction_train_dataloader
+    instruction_datasets[task_name_i] = instruction_train_dataset
 
-    # print(f"{task_name_i} No Attack instruction:")
-    # for batch in instruction_train_dataloader:
-    #     print("Input IDs:", batch["input_ids"])
-    #     print("Attention Mask:", batch["attention_mask"])
-    #     print("Tag IDs:", batch["tag_ids"])
-    #     print()
-
+    for example in instruction_train_dataset:
+        print("Input IDs:", example["input_ids"])
+        print("Attention Mask:", example["attention_mask"])
+        print("Tag IDs:", example["tag_ids"])
+        print()
+        break
 
 for task_name_i in injected_attack_tasks.keys():
-    injected_dataloaders[task_name_i] = {}
+    injected_datasets[task_name_i] = {}
 
     for task_name_j in injected_attack_tasks[task_name_i].keys():
         processed_injected_train = injected_attack_tasks[task_name_i][task_name_j]
         prepared_injected_train = [(row[0], row[1], row[2]) for row in processed_injected_train ]
 
         injected_train_dataset = TaggingDataset(prepared_injected_train, tokenizer)
-        injected_train_dataloader = DataLoader(
-            injected_train_dataset,
-            batch_size=1,
-            shuffle=True,
-            collate_fn=make_collate_fn(tokenizer)
-            )
         
-        injected_dataloaders[task_name_i][task_name_j] = injected_train_dataloader
+        injected_datasets[task_name_i][task_name_j] = injected_train_dataset
 
-        # print(f"{task_name_i} original x {task_name_j} injected instruction:")
-        # for batch in injected_train_dataloader:
-        #     print("Input IDs:", batch["input_ids"])
-        #     print("Attention Mask:", batch["attention_mask"])
-        #     print("Tag IDs:", batch["tag_ids"])
-        #     print()
+        print(f"{task_name_i} original x {task_name_j} injected instruction:")
+        for example in injected_train_dataset:
+            print("Input IDs:", example["input_ids"])
+            print("Attention Mask:", example["attention_mask"])
+            print("Tag IDs:", example["tag_ids"])
+            print()
+            break
+
+# Combine the datasets for full training
+combined_datasets = []
+
+# Combine instruction datasets
+for dataset in instruction_datasets.values():
+    combined_datasets.append(dataset)
+
+# Combine injected datasets
+for original_task in injected_datasets.keys():
+    for dataset in injected_datasets[original_task].values():
+        combined_datasets.append(dataset)
+
+
+full_train_dataset = ConcatDataset(combined_datasets)
+
+# Set the training dataloader
+train_dataloader = instruction_train_dataloader = DataLoader(
+    full_train_dataset,
+    batch_size=2,
+    shuffle=True,
+    collate_fn=make_collate_fn(tokenizer)
+)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-num_epochs = 15
+num_epochs = 4
 
 # Initialize the model
-model = LlamaWithDefenseTags(llama_model_name=LLAMA_3P2_1B_MODEL_NAME, num_tags=2)  # Replace with actual model name
+model = LlamaWithDefenseTags(llama_model_name=base_model_name, num_tags=2)  # Replace with actual model name
 model = model.to(device)
 
 # Create the optimizer
 optimizer = AdamW(model.parameters(), lr=1e-7)
-
-# Set your dataloader
-instruction_train_dataloader = instruction_dataloaders[DUP_DETECTION]
 
 # Training loop
 model.train()
@@ -159,3 +192,12 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         loop.set_postfix(loss=loss.item())
+
+# Initialize a huggingface Repository
+repo = Repository(local_dir=".", clone_from=repo_name)
+
+# Push model weights
+model_name = f"{base_model_name}_Defensive_Tagging"
+model.save_pretrained(model_name)
+
+repo.push_to_hub(commit_message=f"Upload Defensive Tagging model fine-tuned on {base_model_name}")

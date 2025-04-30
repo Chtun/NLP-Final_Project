@@ -50,14 +50,7 @@ class LlamaWithDefenseTags(nn.Module):
         # Apply the tag mask: Set embeddings to 0 where tag_mask is 0 (invalid tags)
         tag_embeds = tag_embeds.masked_fill(tag_mask.unsqueeze(-1) == 0, 0.0)
 
-        # Ensure tag_embeds and token_embeds have the same length (pad or truncate tag_embeds if needed)
-        if tag_embeds.size(1) < token_embeds.size(1):
-            # Pad tag_embeds with zeros if tag_embeds is shorter than token_embeds
-            pad_size = token_embeds.size(1) - tag_embeds.size(1)
-            tag_embeds = torch.cat([tag_embeds, torch.zeros(tag_embeds.size(0), pad_size, tag_embeds.size(2), device=tag_embeds.device)], dim=1)
-        elif tag_embeds.size(1) > token_embeds.size(1):
-            # Truncate tag_embeds if it's longer than token_embeds
-            tag_embeds = tag_embeds[:, :token_embeds.size(1), :]
+        assert tag_embeds.size(1) == token_embeds.size(1), "Mismatched sequence lengths after padding"
 
         # Add defense tag embeddings to token embeddings
         inputs_embeds = token_embeds + tag_embeds

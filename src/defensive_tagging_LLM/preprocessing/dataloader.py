@@ -50,7 +50,7 @@ class TaggingDataset(Dataset):
 
         full_tag_ids = torch.cat([
             tag_ids,
-            torch.full((output_ids.size(0),), 0, dtype=torch.long)  # Assume tag 0 for response
+            torch.full((output_ids.size(0),), -1, dtype=torch.long)  # Use -1 to mask response tagging.
         ], dim=0)
 
         # Labels: same as full_input_ids, but mask prompt tokens with -100
