@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from transformers import LlamaForCausalLM, LlamaTokenizer
+from transformers import LlamaForCausalLM, AutoTokenizer
 
 class DefenseTagEncoder(nn.Module):
     def __init__(self, num_tags: int, tag_dim: int):
@@ -25,8 +25,11 @@ class LlamaWithDefenseTags(nn.Module):
     def __init__(self, llama_model_name: str, num_tags: int):
         super().__init__()
         # Load pre-trained LLaMA model
-        self.llama = LlamaForCausalLM.from_pretrained(llama_model_name)
-        self.tokenizer = LlamaTokenizer.from_pretrained(llama_model_name)
+        self.llama = LlamaForCausalLM.from_pretrained(
+            llama_model_name,
+            torch_dtype=torch.float16
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(llama_model_name)
 
         # DefenseTagEncoder
         self.defense_tag_encoder = DefenseTagEncoder(num_tags=num_tags, tag_dim=self.llama.model.embed_tokens.embedding_dim)
