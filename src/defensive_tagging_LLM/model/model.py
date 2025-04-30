@@ -5,7 +5,7 @@ from transformers import LlamaForCausalLM, AutoTokenizer
 class DefenseTagEncoder(nn.Module):
     def __init__(self, num_tags: int, tag_dim: int):
         super().__init__()
-        self.tag_embeddings = nn.Embedding(num_tags, tag_dim).half()
+        self.tag_embeddings = nn.Embedding(num_tags, tag_dim)
         self._initialize_weights()
 
     def _initialize_weights(self):
@@ -26,8 +26,7 @@ class LlamaWithDefenseTags(nn.Module):
         super().__init__()
         # Load pre-trained LLaMA model
         self.llama = LlamaForCausalLM.from_pretrained(
-            llama_model_name,
-            torch_dtype=torch.float16
+            llama_model_name
         )
         self.tokenizer = AutoTokenizer.from_pretrained(llama_model_name)
 

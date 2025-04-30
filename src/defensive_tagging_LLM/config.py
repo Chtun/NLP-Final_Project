@@ -11,6 +11,9 @@ DUP_DETECTION = "Duplicate sentence detection"
 
 # Llama
 LLAMA_7B_MODEL_NAME = "meta-llama/llama-2-7b-chat-hf"
+LLAMA_3P1_8B_MODEL_NAME = "meta-llama/Llama-3.1-8B"
+LLAMA_3P2_3B_MODEL_NAME = "meta-llama/Llama-3.2-3B"
+LLAMA_3P2_1B_MODEL_NAME = "meta-llama/Llama-3.2-1B"
 
 def get_data_path(task_name: str, train: bool):
     if (task_name == DUP_DETECTION):

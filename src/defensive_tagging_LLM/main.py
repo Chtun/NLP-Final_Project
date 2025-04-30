@@ -14,7 +14,6 @@ prompt_file = "../prompts/" +  "prompts.json"
 
 prompts_dict = extract_prompts(prompt_file=prompt_file)
 
-
 task_names = [
     "Duplicate sentence detection"
 ]
@@ -65,7 +64,7 @@ for task_name_i in task_names:
 
 
 # Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained(LLAMA_7B_MODEL_NAME)
+tokenizer = AutoTokenizer.from_pretrained(LLAMA_3P2_1B_MODEL_NAME)
 tokenizer.pad_token = tokenizer.eos_token
 
 # Prepare the data for the custom dataset formatter and loader.
@@ -80,21 +79,19 @@ for task_name_i in no_attack_tasks.keys():
     instruction_train_dataset = TaggingDataset(prepared_instruction_train, tokenizer)
     instruction_train_dataloader = DataLoader(
         instruction_train_dataset,
-        batch_size=2,
+        batch_size=1,
         shuffle=True,
         collate_fn=make_collate_fn(tokenizer)
         )
     
     instruction_dataloaders[task_name_i] = instruction_train_dataloader
 
-    print(f"{task_name_i} No Attack instruction:")
-    for batch in instruction_train_dataloader:
-        # print("Input IDs:", batch["input_ids"])
-        # print("Attention Mask:", batch["attention_mask"])
-        # print("Tag IDs:", batch["tag_ids"])
-        # print("Tag Mask:", batch["tag_mask"])
-        print("First input shape:", batch["input_ids"][0].shape)
-        print()
+    # print(f"{task_name_i} No Attack instruction:")
+    # for batch in instruction_train_dataloader:
+    #     print("Input IDs:", batch["input_ids"])
+    #     print("Attention Mask:", batch["attention_mask"])
+    #     print("Tag IDs:", batch["tag_ids"])
+    #     print()
 
 
 for task_name_i in injected_attack_tasks.keys():
@@ -107,60 +104,58 @@ for task_name_i in injected_attack_tasks.keys():
         injected_train_dataset = TaggingDataset(prepared_injected_train, tokenizer)
         injected_train_dataloader = DataLoader(
             injected_train_dataset,
-            batch_size=2,
+            batch_size=1,
             shuffle=True,
             collate_fn=make_collate_fn(tokenizer)
             )
         
         injected_dataloaders[task_name_i][task_name_j] = injected_train_dataloader
 
-        print(f"{task_name_i} original x {task_name_j} injected instruction:")
-        for batch in injected_train_dataloader:
-            # print("Input IDs:", batch["input_ids"])
-            # print("Attention Mask:", batch["attention_mask"])
-            # print("Tag IDs:", batch["tag_ids"])
-            # print("Tag Mask:", batch["tag_mask"])
-            print("First input shape:", batch["input_ids"][0].shape)
-            print()
-            break
+        # print(f"{task_name_i} original x {task_name_j} injected instruction:")
+        # for batch in injected_train_dataloader:
+        #     print("Input IDs:", batch["input_ids"])
+        #     print("Attention Mask:", batch["attention_mask"])
+        #     print("Tag IDs:", batch["tag_ids"])
+        #     print()
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# num_epochs = 20
 
-# # Initialize the model
-# model = LlamaWithDefenseTags(llama_model_name=LLAMA_7B_MODEL_NAME, num_tags=2)  # Replace with actual model name
-# model = model.to(device)  # Ensure you're using the correct device (GPU/CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+num_epochs = 15
 
-# # Create the optimizer
-# optimizer = AdamW(model.parameters(), lr=5e-5)
+# Initialize the model
+model = LlamaWithDefenseTags(llama_model_name=LLAMA_3P2_1B_MODEL_NAME, num_tags=2)  # Replace with actual model name
+model = model.to(device)
 
-# # Set your dataloader
-# instruction_train_dataloader = instruction_dataloaders[DUP_DETECTION]
+# Create the optimizer
+optimizer = AdamW(model.parameters(), lr=1e-7)
 
-# # Training loop
-# model.train()
-# for epoch in range(num_epochs):
-#     loop = tqdm(instruction_train_dataloader, desc=f"Epoch {epoch+1}")
-#     for batch in loop:
-#         # Move data to device
-#         input_ids = batch['input_ids'].to(device)
-#         attention_mask = batch['attention_mask'].to(device)
-#         tag_ids = batch['tag_ids'].to(device)
-#         labels = batch['labels'].to(device)
+# Set your dataloader
+instruction_train_dataloader = instruction_dataloaders[DUP_DETECTION]
 
-#         # Forward pass: compute logits and loss
-#         outputs = model(
-#             input_ids=input_ids,
-#             attention_mask=attention_mask,
-#             tag_ids=tag_ids,
-#             labels=labels
-#         )
-#         loss = outputs.loss
+# Training loop
+model.train()
+for epoch in range(num_epochs):
+    loop = tqdm(instruction_train_dataloader, desc=f"Epoch {epoch+1}")
+    for batch in loop:
+        optimizer.zero_grad()
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        tag_ids = batch['tag_ids'].to(device)
+        tag_mask = batch['tag_mask'].to(device)
+        labels = batch['labels'].to(device)
 
-#         # Backpropagation
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
+        # with autocast():
+        outputs = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            tag_ids=tag_ids,
+            tag_mask=tag_mask,
+            labels=labels
+        )
+        loss = outputs.loss
 
-#         # Log loss
-#         loop.set_postfix(loss=loss.item())
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+
+        loop.set_postfix(loss=loss.item())
