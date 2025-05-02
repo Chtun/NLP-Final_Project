@@ -6,26 +6,26 @@ from defensive_tagging_LLM.model.model import *
 
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader, ConcatDataset
-
 from torch.optim import AdamW
+
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from huggingface_hub import HfApi
 
 
-prompt_file = PROMPTS_FILE
 base_model_name = LLAMA_3P2_1B_MODEL_NAME # The base LLM's name.
 repo_name = "Chtun/Defensive_Tagging_LLM" # For saving this model to a huggingface repo.
 
-prompts_dict = extract_prompts(prompt_file=prompt_file)
+prompts_dict = extract_prompts(prompt_file=PROMPTS_FILE)
 
 task_names = [
     DUP_DETECTION,
-    # GRAMMAR_CORRECTION,
-    # NAT_LANG_INFERENCE,
-    # SENT_ANALYSIS,
-    # SPAM_DETECTION,
-    # SUMMARIZATION
+    GRAMMAR_CORRECTION,
+    NAT_LANG_INFERENCE,
+    SENT_ANALYSIS,
+    SPAM_DETECTION,
+    SUMMARIZATION
 ]
 
 no_attack_tasks = {}
@@ -103,7 +103,7 @@ for task_name_i in no_attack_tasks.keys():
 
     # Create dataset and dataloader
     instruction_train_dataset = TaggingDataset(prepared_instruction_train, tokenizer)
-    
+
     instruction_datasets[task_name_i] = instruction_train_dataset
 
     # for example in instruction_train_dataset:
@@ -121,7 +121,7 @@ for task_name_i in injected_attack_tasks.keys():
         prepared_injected_train = [(row[0], row[1], row[2]) for row in processed_injected_train ]
 
         injected_train_dataset = TaggingDataset(prepared_injected_train, tokenizer)
-        
+
         injected_datasets[task_name_i][task_name_j] = injected_train_dataset
 
         # print(f"{task_name_i} original x {task_name_j} injected instruction:")
@@ -150,7 +150,7 @@ full_train_dataset = ConcatDataset(combined_datasets)
 # Set the training dataloader
 train_dataloader = instruction_train_dataloader = DataLoader(
     full_train_dataset,
-    batch_size=1,
+    batch_size=2,
     shuffle=True,
     collate_fn=make_collate_fn(tokenizer)
 )
@@ -170,6 +170,8 @@ model = model.to(device)
 
 # Create the optimizer
 optimizer = AdamW(model.parameters(), lr=1e-7)
+
+loss_history = []
 
 # Training loop
 model.train()
@@ -199,6 +201,8 @@ for epoch in range(num_epochs):
 
         loop.set_postfix(loss=loss.item())
 
+        loss_history.append(loss.item())  # Save loss
+
 
 # Create a model weights folder, if not made already
 os.makedirs(MODEL_WEIGHTS_FOLDER, exist_ok=True)
@@ -218,8 +222,11 @@ api.upload_folder(
     repo_type="model",
 )
 
-# Clear the model from memory
-del model
-
-# Clear cache
-torch.cuda.empty_cache()
+plt.figure(figsize=(10, 5))
+plt.plot(loss_history, label='Training Loss')
+plt.xlabel("Iteration")
+plt.ylabel("Loss")
+plt.title("Model Training Loss")
+plt.legend()
+plt.grid(True)
+plt.show()
