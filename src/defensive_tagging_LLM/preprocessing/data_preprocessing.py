@@ -136,12 +136,13 @@ def remove_space_before_punctuation(text: str) -> str:
 
 def process_tasks(task_name: str, input_output: list, prompt: str) -> list:
     empty_injection_list = ["" for i in input_output]
+    empty_attacker_output_list = ["" for i in input_output]
 
-    return process_tasks_with_injection(task_name, input_output, prompt, empty_injection_list)
+    return process_tasks_with_injection(task_name, input_output, prompt, empty_injection_list, empty_attacker_output_list)
 
 
-def process_tasks_with_injection(task_name: str, input_output: list, prompt: str, injection_list: list) -> list:
-    if (len(input_output) != len(injection_list)):
+def process_tasks_with_injection(task_name: str, input_output: list, prompt: str, injection_list: list, attacker_output_list: list) -> list:
+    if (len(input_output) != len(injection_list)) or (len(injection_list) != len(attacker_output_list)):
         raise Exception("The input-output pair list and injection lists are not the same size!")
     
     processed_tuples = []
@@ -204,7 +205,9 @@ def process_tasks_with_injection(task_name: str, input_output: list, prompt: str
         text_set = [query, data]
         tag_set = [QUERY_TAG_IDX, DATA_TAG_IDX]
 
-        processed_tuples.append([text_set, tag_set, output])
+        attacker_output = attacker_output_list[index]
+
+        processed_tuples.append([text_set, tag_set, output, attacker_output])
 
     return processed_tuples
 
@@ -218,11 +221,13 @@ def generate_injection_task_strs(injected_task_name: str, injection_set: list, i
         input_output=sampled_injection_set,
         prompt=injected_prompt
     )
-    processed_injected_set = [
+    processed_injected_tasks = [
         elem[0][0] + "\n" + elem[0][1] for elem in processed_injected_set
     ]
 
-    return processed_injected_set
+    expected_injected_output = [processed_injected_set[i][2] for i in range(len(processed_injected_set))]
+
+    return processed_injected_tasks, expected_injected_output
 
 def generate_target_injection_pairs(target_task_name: str, target_task_corpus: list, injected_task_name: str, injected_prompt: str, injected_task_corpus: str, num_samples: int=200) -> tuple[list, list]:
     sampled_injected_tasks = []
@@ -245,13 +250,13 @@ def generate_target_injection_pairs(target_task_name: str, target_task_corpus: l
                 neg_match_train = [t for t in target_task_corpus if t[1] == 0]
 
             # Process the injected tasks into a sample of list of strings.
-            processed_pos_injected_tasks = generate_injection_task_strs(
+            processed_pos_injected_tasks, expected_pos_attacker_outputs = generate_injection_task_strs(
                 injected_task_name=injected_task_name,
                 injection_set=pos_match_train,
                 injected_prompt=injected_prompt,
                 num_samples=int(num_samples/2)
             )
-            processed_neg_injected_tasks = generate_injection_task_strs(
+            processed_neg_injected_tasks, expected_neg_attacker_outputs = generate_injection_task_strs(
                 injected_task_name=injected_task_name,
                 injection_set=neg_match_train,
                 injected_prompt=injected_prompt,
@@ -259,6 +264,7 @@ def generate_target_injection_pairs(target_task_name: str, target_task_corpus: l
             )
 
             sampled_injected_tasks = processed_neg_injected_tasks + processed_pos_injected_tasks
+            expected_attacker_outputs = expected_neg_attacker_outputs + expected_pos_attacker_outputs
 
             # Generate samples for positive and negative target tasks.
             sampled_pos_target_tasks = random.sample(pos_match_train, min(int(num_samples/2), len(pos_match_train)))
@@ -267,7 +273,7 @@ def generate_target_injection_pairs(target_task_name: str, target_task_corpus: l
             sampled_target_tasks = sampled_pos_target_tasks + sampled_neg_target_tasks
         elif target_task_name == SUMMARIZATION or target_task_name == GRAMMAR_CORRECTION:
             # Process the injected tasks into a sample of list of strings.
-            sampled_injected_tasks = generate_injection_task_strs(
+            sampled_injected_tasks, expected_attacker_outputs = generate_injection_task_strs(
                     injected_task_name=injected_task_name,
                     injection_set=injected_task_corpus,
                     injected_prompt=injected_prompt,
@@ -280,7 +286,7 @@ def generate_target_injection_pairs(target_task_name: str, target_task_corpus: l
             raise Exception("Task name not recognized!")
     else:
         # Process the injected tasks into a sample of list of strings.
-        sampled_injected_tasks = generate_injection_task_strs(
+        sampled_injected_tasks, expected_attacker_outputs = generate_injection_task_strs(
                 injected_task_name=injected_task_name,
                 injection_set=injected_task_corpus,
                 injected_prompt=injected_prompt,
@@ -299,4 +305,4 @@ def generate_target_injection_pairs(target_task_name: str, target_task_corpus: l
         injected_task_list=sampled_injected_tasks
     )
 
-    return injection_list, sampled_target_tasks
+    return injection_list, expected_attacker_outputs, sampled_target_tasks

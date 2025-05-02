@@ -66,6 +66,49 @@ class LlamaWithDefenseTags(nn.Module):
 
         return outputs
     
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        tag_ids: torch.Tensor,
+        tag_mask: torch.Tensor,
+        max_new_tokens: int = 100,
+        **generate_kwargs
+    ) -> torch.Tensor:
+        """
+        Generate output token IDs using LLaMA with defense tags.
+
+        Args:
+            input_ids: (batch_size, seq_len) token IDs
+            attention_mask: (batch_size, seq_len)
+            tag_ids: (batch_size, seq_len)
+            tag_mask: (batch_size, seq_len) - 1 for valid tags, 0 for padding
+            max_new_tokens: int - how many tokens to generate
+            generate_kwargs: other kwargs for `model.generate`
+
+        Returns:
+            generated_ids: (batch_size, seq_len + max_new_tokens) token IDs
+        """
+        self.eval()
+        with torch.no_grad():
+            # Get token and tag embeddings
+            token_embeds = self.llama.model.embed_tokens(input_ids)
+            tag_embeds = self.defense_tag_encoder(tag_ids)
+            tag_embeds = tag_embeds.masked_fill(tag_mask.unsqueeze(-1) == 0, 0.0)
+
+            # Add token and tag embeddings
+            inputs_embeds = token_embeds + tag_embeds
+
+            # Run generation
+            generated_ids = self.llama.generate(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                max_new_tokens=max_new_tokens,
+                **generate_kwargs
+            )
+
+        return generated_ids
+
     def save_pretrained(self, save_directory: str):
         os.makedirs(save_directory, exist_ok=True)
         # Save base LLaMA model and tokenizer
@@ -97,5 +140,3 @@ class LlamaWithDefenseTags(nn.Module):
         model.defense_tag_encoder.load_state_dict(torch.load(tag_encoder_path))
 
         return model
-
-
