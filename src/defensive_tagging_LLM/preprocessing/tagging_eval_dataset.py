@@ -21,6 +21,8 @@ class TaggingEvalDataset(TaggingTrainDataset):
 
         input_ids, attention_mask, tag_ids = self.tokenize_prompt_segments(texts, tags)
 
+        tag_mask = (tag_ids != -1).float() # Tag mask will calculate where to remove the vectors.
+
         # Tokenize the expected original output
         original_output_tokens = self.tokenizer(
             expected_original_output,
@@ -42,6 +44,7 @@ class TaggingEvalDataset(TaggingTrainDataset):
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
                 "tag_ids": tag_ids,
+                "tag_mask": tag_mask,
                 "expected_original_output_ids": original_output_ids,
                 "expected_attacked_output_ids": attacked_output_ids
             }
@@ -50,6 +53,7 @@ class TaggingEvalDataset(TaggingTrainDataset):
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
                 "tag_ids": tag_ids,
+                "tag_mask": tag_mask,
                 "expected_original_output_ids": original_output_ids
             }
 

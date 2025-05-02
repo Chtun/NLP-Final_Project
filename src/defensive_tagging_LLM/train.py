@@ -55,10 +55,10 @@ for task_name_i in task_names:
     no_attack_tasks[task_name_i] = processed_instruction_train
     injected_attack_tasks[task_name_i] = {}
 
-    print()
-    print(f"Example of no-attack task for {task_name_i}")
-    print(processed_instruction_train[:3])
-    print()
+    # print()
+    # print(f"Example of no-attack task for {task_name_i}")
+    # print(processed_instruction_train[:3])
+    # print()
 
     # Generate the Injected Attack tasks.
     for task_name_j in task_names:
@@ -85,9 +85,9 @@ for task_name_i in task_names:
 
         injected_attack_tasks[task_name_i][task_name_j] = processed_injected_tasks
 
-        print(f"Example of injection of task {task_name_j} into original task {task_name_i}:")
-        print(processed_injected_tasks[:3])
-        print()
+        # print(f"Example of injection of task {task_name_j} into original task {task_name_i}:")
+        # print(processed_injected_tasks[:3])
+        # print()
 
 
 # Load the tokenizer
