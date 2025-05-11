@@ -202,6 +202,8 @@ def process_tasks_with_injection(task_name: str, input_output: list, prompt: str
         else:
             raise Exception("Task name not recognized!")
 
+        query = query + "\n"
+
         text_set = [query, data]
         tag_set = [QUERY_TAG_IDX, DATA_TAG_IDX]
 

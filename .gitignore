@@ -2,3 +2,4 @@
 *__pycache__
 login.txt
 defensive_tagging_LLM.egg-info
+/output

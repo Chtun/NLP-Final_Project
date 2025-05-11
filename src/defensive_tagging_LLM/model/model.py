@@ -34,13 +34,16 @@ class LlamaWithDefenseTags(nn.Module):
         # DefenseTagEncoder
         self.defense_tag_encoder = DefenseTagEncoder(num_tags=num_tags, tag_dim=self.llama.model.embed_tokens.embedding_dim)
 
-    def forward(self, input_ids, attention_mask, tag_ids, tag_mask, labels=None):
+    def forward(self, input_ids, attention_mask, tag_ids, tag_mask, labels=None, **kwargs):
         """
         Args:
             input_ids: (batch_size, seq_len)
             attention_mask: (batch_size, seq_len)
             tag_ids: (batch_size, seq_len)
         """
+
+        if kwargs:
+            print(f"Warning: Unused kwargs in forward(): {list(kwargs.keys())}")
 
         # Standard token embeddings
         token_embeds = self.llama.model.embed_tokens(input_ids)

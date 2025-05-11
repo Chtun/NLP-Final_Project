@@ -6,16 +6,14 @@ from defensive_tagging_LLM.model.model import *
 
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader, ConcatDataset
-from torch.optim import AdamW
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from huggingface_hub import HfApi
 
+base_model_name = LLAMA_3P2_1B_INSTRUCT_MODEL_NAME # The base LLM's name.
+save_directory = MODEL_WEIGHTS_FOLDER # For grabbing the saved model.
 
-base_model_name = LLAMA_3P2_1B_MODEL_NAME # The base LLM's name.
-repo_name = "Chtun/Defensive_Tagging_LLM" # For saving this model to a huggingface repo.
 
 prompts_dict = extract_prompts(prompt_file=PROMPTS_FILE)
 
@@ -165,53 +163,53 @@ num_batches = len(eval_dataloader)
 # Print the number of batches
 print(f"Number of batches: {num_batches}")
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# num_epochs = 4
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+num_epochs = 4
 
-# # Initialize the model
-# model = LlamaWithDefenseTags(llama_model_name=base_model_name, num_tags=2)  # Replace with actual model name
-# model = model.to(device)
+# Initialize the model
+model = LlamaWithDefenseTags.from_pretrained(save_directory)  # Replace with actual model name
+model = model.to(device)
 
-# # Initialize metrics or results storage
-# generation_results = []
+# Initialize metrics or results storage
+generation_results = []
 
-# # Evaluation loop
-# model.eval()  # Switch model to evaluation mode
-# with torch.no_grad():  # No gradients are needed for evaluation
-#     for epoch in range(num_epochs):
-#         loop = tqdm(eval_dataloader, desc=f"Epoch {epoch+1}")
-#         for example in loop:
-#             # Get inputs for evaluation
-#             input_ids = example["input_ids"].to(device)
-#             attention_mask = example["attention_mask"].to(device)
-#             expected_output_ids = example["expected_original_output_ids"].to(device)
+# Evaluation loop
+model.eval()  # Switch model to evaluation mode
+with torch.no_grad():  # No gradients are needed for evaluation
+    for epoch in range(num_epochs):
+        loop = tqdm(eval_dataloader, desc=f"Epoch {epoch+1}")
+        for example in loop:
+            # Get inputs for evaluation
+            input_ids = example["input_ids"].to(device)
+            attention_mask = example["attention_mask"].to(device)
+            expected_output_ids = example["expected_original_output_ids"].to(device)
 
-#             # Generate output from the model
-#             generated_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=50)  # Adjust max_length if needed
+            # Generate output from the model
+            generated_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=50)  # Adjust max_length if needed
 
-#             # Decode the generated ids into text
-#             generated_text = model.tokenizer.decode(generated_ids.squeeze(0), skip_special_tokens=True)
+            # Decode the generated ids into text
+            generated_text = model.tokenizer.decode(generated_ids.squeeze(0), skip_special_tokens=True)
 
-#             # Decode the expected output for comparison
-#             expected_output_text = model.tokenizer.decode(expected_output_ids.squeeze(0), skip_special_tokens=True)
+            # Decode the expected output for comparison
+            expected_output_text = model.tokenizer.decode(expected_output_ids.squeeze(0), skip_special_tokens=True)
 
-#             # Compare the generated text with the expected output text
-#             correct = generated_text.strip() == expected_output_text.strip()
+            # Compare the generated text with the expected output text
+            correct = generated_text.strip() == expected_output_text.strip()
 
-#             # Store the result
-#             generation_results.append({
-#                 "input_text": model.tokenizer.decode(input_ids.squeeze(0), skip_special_tokens=True),
-#                 "expected_output": expected_output_text,
-#                 "generated_output": generated_text,
-#                 "correct": correct
-#             })
+            # Store the result
+            generation_results.append({
+                "input_text": model.tokenizer.decode(input_ids.squeeze(0), skip_special_tokens=True),
+                "expected_output": expected_output_text,
+                "generated_output": generated_text,
+                "correct": correct
+            })
 
-#             # Update the loop description with accuracy or any other metrics
-#             loop.set_postfix(correct=correct)
+            # Update the loop description with accuracy or any other metrics
+            loop.set_postfix(correct=correct)
 
-# # After the loop, you can calculate overall accuracy or any other metric
-# correct_count = sum(result["correct"] for result in generation_results)
-# total_count = len(generation_results)
-# accuracy = correct_count / total_count if total_count > 0 else 0.0
+# After the loop, you can calculate overall accuracy or any other metric
+correct_count = sum(result["correct"] for result in generation_results)
+total_count = len(generation_results)
+accuracy = correct_count / total_count if total_count > 0 else 0.0
 
-# print(f"Generation Accuracy: {accuracy:.4f}")
+print(f"Generation Accuracy: {accuracy:.4f}")
